@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { eq, and, desc, asc, sql } from 'drizzle-orm';
+import { eq, and, desc, asc, sql, inArray } from 'drizzle-orm';
 import { createTRPCRouter, protectedProcedure } from '../trpc';
 import { products, searchResults, searchBrands, searches } from '@/server/db/schema';
 
@@ -58,7 +58,7 @@ export const productsRouter = createTRPCRouter({
       const countResult = await ctx.db
         .select({ count: sql<number>`count(*)` })
         .from(searchResults)
-        .where(sql`${searchResults.searchBrandId} = ANY(${searchBrandIds})`);
+        .where(inArray(searchResults.searchBrandId, searchBrandIds));
 
       const total = Number(countResult[0]?.count ?? 0);
       const totalPages = Math.ceil(total / input.limit);
@@ -72,7 +72,7 @@ export const productsRouter = createTRPCRouter({
         })
         .from(searchResults)
         .innerJoin(products, eq(searchResults.productId, products.id))
-        .where(sql`${searchResults.searchBrandId} = ANY(${searchBrandIds})`)
+        .where(inArray(searchResults.searchBrandId, searchBrandIds))
         .orderBy(orderByClause)
         .limit(input.limit)
         .offset(offset);
@@ -81,7 +81,7 @@ export const productsRouter = createTRPCRouter({
       const lastScrapeResult = await ctx.db
         .select({ lastScrapedAt: searchBrands.lastScrapedAt })
         .from(searchBrands)
-        .where(sql`${searchBrands.id} = ANY(${searchBrandIds})`)
+        .where(inArray(searchBrands.id, searchBrandIds))
         .orderBy(desc(searchBrands.lastScrapedAt))
         .limit(1);
 
