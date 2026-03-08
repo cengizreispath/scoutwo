@@ -174,10 +174,9 @@ export async function scrapeProducts(
   // Check if we have a specific scraper for this brand
   const brandScraper = BRAND_SCRAPERS[brandSlug.toLowerCase()];
   
-  // For MVP, use mock data for all brands
-  // TODO: Enable real scrapers when ready
-  if (process.env.USE_MOCK_SCRAPER !== 'false') {
-    console.log(`[Scraper] Using mock data for ${brandSlug}`);
+  // Use mock data only when explicitly enabled (for development/testing)
+  if (process.env.USE_MOCK_SCRAPER === 'true') {
+    console.log(`[Scraper] Using mock data for ${brandSlug} (USE_MOCK_SCRAPER=true)`);
     return genericScraper(null as any, brandSlug, query);
   }
 
