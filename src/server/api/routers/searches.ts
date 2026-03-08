@@ -70,14 +70,21 @@ export const searchesRouter = createTRPCRouter({
         })
         .returning();
 
-      // Insert brand associations
+      // Insert brand associations - convert slugs to UUIDs
       if (input.brandIds.length > 0) {
-        await ctx.db.insert(searchBrands).values(
-          input.brandIds.map((brandId) => ({
-            searchId: newSearch.id,
-            brandId,
-          }))
-        );
+        // Get brand UUIDs from slugs
+        const brandRecords = await ctx.db.query.brands.findMany({
+          where: (brands, { inArray }) => inArray(brands.slug, input.brandIds),
+        });
+
+        if (brandRecords.length > 0) {
+          await ctx.db.insert(searchBrands).values(
+            brandRecords.map((brand) => ({
+              searchId: newSearch.id,
+              brandId: brand.id,
+            }))
+          );
+        }
       }
 
       return newSearch;
@@ -113,17 +120,24 @@ export const searchesRouter = createTRPCRouter({
         .where(eq(searches.id, input.id))
         .returning();
 
-      // Update brand associations if provided
+      // Update brand associations if provided - convert slugs to UUIDs
       if (input.data.brandIds) {
         await ctx.db.delete(searchBrands).where(eq(searchBrands.searchId, input.id));
         
         if (input.data.brandIds.length > 0) {
-          await ctx.db.insert(searchBrands).values(
-            input.data.brandIds.map((brandId) => ({
-              searchId: input.id,
-              brandId,
-            }))
-          );
+          // Get brand UUIDs from slugs
+          const brandRecords = await ctx.db.query.brands.findMany({
+            where: (brands, { inArray }) => inArray(brands.slug, input.data.brandIds!),
+          });
+
+          if (brandRecords.length > 0) {
+            await ctx.db.insert(searchBrands).values(
+              brandRecords.map((brand) => ({
+                searchId: input.id,
+                brandId: brand.id,
+              }))
+            );
+          }
         }
       }
 
