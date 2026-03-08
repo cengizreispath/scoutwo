@@ -4,33 +4,38 @@ const getRedisUrl = () => {
   if (process.env.REDIS_URL) {
     return process.env.REDIS_URL;
   }
-  return 'redis://localhost:6379';
+  // Fallback to host/port if REDIS_URL not provided
+  const host = process.env.REDIS_HOST || 'localhost';
+  const port = process.env.REDIS_PORT || '6379';
+  return `redis://${host}:${port}`;
 };
 
 // Lazy initialization to avoid build-time connection
 let _redis: Redis | null = null;
 let _redisSubscriber: Redis | null = null;
 
-export const getRedis = () => {
-  if (!_redis && typeof window === 'undefined' && process.env.REDIS_URL) {
+export const getRedis = (): Redis => {
+  if (!_redis && typeof window === 'undefined') {
     _redis = new Redis(getRedisUrl(), {
       maxRetriesPerRequest: null,
-      lazyConnect: true,
+      enableReadyCheck: false,
+      enableOfflineQueue: true,
     });
   }
-  return _redis;
+  return _redis!;
 };
 
-export const getRedisSubscriber = () => {
-  if (!_redisSubscriber && typeof window === 'undefined' && process.env.REDIS_URL) {
+export const getRedisSubscriber = (): Redis => {
+  if (!_redisSubscriber && typeof window === 'undefined') {
     _redisSubscriber = new Redis(getRedisUrl(), {
       maxRetriesPerRequest: null,
-      lazyConnect: true,
+      enableReadyCheck: false,
+      enableOfflineQueue: true,
     });
   }
-  return _redisSubscriber;
+  return _redisSubscriber!;
 };
 
-// For backward compatibility (may be null during build)
-export const redis = null as unknown as Redis;
-export const redisSubscriber = null as unknown as Redis;
+// Export singleton instances for direct usage
+export const redis = getRedis();
+export const redisSubscriber = getRedisSubscriber();
