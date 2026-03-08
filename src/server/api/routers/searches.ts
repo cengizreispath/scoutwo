@@ -19,7 +19,8 @@ const getRedisConnection = () => {
         username: url.username || undefined,
       };
     } catch (error) {
-      console.error('[Redis] Failed to parse REDIS_URL:', error);
+      console.error('[Redis] Failed to parse REDIS_URL, falling back to REDIS_HOST/PORT:', error);
+      // Fall through to fallback
     }
   }
   
