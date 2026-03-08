@@ -1,15 +1,15 @@
 'use client';
 
-import { use } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { SearchForm } from '@/components/search/SearchForm';
 import { trpc } from '@/lib/trpc/client';
 import { toast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { CreateSearchInput } from '@/lib/validations';
 
-export default function EditSearchPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function EditSearchPage() {
+  const params = useParams();
+  const id = params.id as string;
   const router = useRouter();
   const utils = trpc.useUtils();
 
