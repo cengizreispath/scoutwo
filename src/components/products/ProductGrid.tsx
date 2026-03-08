@@ -9,9 +9,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 interface Product {
   id: string;
   name: string;
-  price: number;
-  imageUrl: string;
-  brandName: string;
+  price: string | number;
+  imageUrl: string | null;
+  brandId?: string;
+  brandName?: string;
   productUrl: string;
   isFavorite?: boolean;
 }
@@ -47,18 +48,25 @@ export function ProductGrid({ products, isLoading, onFavoriteToggle }: ProductGr
     );
   }
 
+  const formatPrice = (price: string | number) => {
+    const numPrice = typeof price === 'string' ? parseFloat(price) : price;
+    return numPrice.toLocaleString('tr-TR');
+  };
+
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
       {products.map((product) => (
         <Card key={product.id} className="group overflow-hidden">
           <CardContent className="p-0">
-            <div className="relative aspect-square">
-              <Image
-                src={product.imageUrl}
-                alt={product.name}
-                fill
-                className="object-cover transition-transform group-hover:scale-105"
-              />
+            <div className="relative aspect-square bg-muted">
+              {product.imageUrl && (
+                <Image
+                  src={product.imageUrl}
+                  alt={product.name}
+                  fill
+                  className="object-cover transition-transform group-hover:scale-105"
+                />
+              )}
               <Button
                 variant="ghost"
                 size="icon"
@@ -71,9 +79,11 @@ export function ProductGrid({ products, isLoading, onFavoriteToggle }: ProductGr
               </Button>
             </div>
             <div className="p-4">
-              <p className="text-xs text-muted-foreground mb-1">{product.brandName}</p>
+              {product.brandName && (
+                <p className="text-xs text-muted-foreground mb-1">{product.brandName}</p>
+              )}
               <h3 className="font-medium text-sm line-clamp-2 mb-2">{product.name}</h3>
-              <p className="font-bold">{product.price.toLocaleString('tr-TR')} TL</p>
+              <p className="font-bold">{formatPrice(product.price)} TL</p>
               <a
                 href={product.productUrl}
                 target="_blank"
