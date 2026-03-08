@@ -190,30 +190,48 @@ export const searchesRouter = createTRPCRouter({
         });
       }
 
-      // Add job to queue
-      const job = await scrapeQueue.add('scrape-search', {
-        searchId: search.id,
-        query: search.query,
-        brands: search.searchBrands.map((sb) => ({
-          searchBrandId: sb.id,
-          brandId: sb.brand.id,
-          brandSlug: sb.brand.slug,
-        })),
-      });
-
-      // Store job status in Redis (with error handling for graceful degradation)
+      // Add job to queue with proper error handling
       try {
-        await redis.set(
-          `scrape:${search.id}:status`,
-          JSON.stringify({ status: 'queued', jobId: job.id }),
-          'EX',
-          3600 // 1 hour TTL
-        );
-      } catch (error) {
-        console.error('[Redis] Failed to store scrape status:', error);
-        // Continue anyway - the job is queued, Redis status is just for tracking
-      }
+        const job = await scrapeQueue.add('scrape-search', {
+          searchId: search.id,
+          query: search.query,
+          brands: search.searchBrands.map((sb) => ({
+            searchBrandId: sb.id,
+            brandId: sb.brand.id,
+            brandSlug: sb.brand.slug,
+          })),
+        });
 
-      return { jobId: job.id, status: 'queued' };
+        // Store job status in Redis (with error handling for graceful degradation)
+        try {
+          await redis.set(
+            `scrape:${search.id}:status`,
+            JSON.stringify({ status: 'queued', jobId: job.id }),
+            'EX',
+            3600 // 1 hour TTL
+          );
+        } catch (error) {
+          console.error('[Redis] Failed to store scrape status:', error);
+          // Continue anyway - the job is queued, Redis status is just for tracking
+        }
+
+        return { jobId: job.id, status: 'queued' };
+      } catch (error) {
+        console.error('[BullMQ] Failed to queue scrape job:', error);
+        
+        // Check if it's a Redis connection error
+        if (error && typeof error === 'object' && 'code' in error && error.code === 'ECONNREFUSED') {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Redis bağlantısı kurulamadı. Lütfen sistem yöneticisiyle iletişime geçin.',
+          });
+        }
+        
+        // Generic error for other cases
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Ürün tarama işlemi başlatılamadı. Lütfen daha sonra tekrar deneyin.',
+        });
+      }
     }),
 });
