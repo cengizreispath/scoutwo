@@ -19,24 +19,30 @@ const BRANDS = [
 
 interface BrandSelectorProps {
   selectedBrands: string[];
-  onBrandsChange: (brands: string[]) => void;
+  onBrandsChange?: (brands: string[]) => void;
+  onSelectionChange?: (brands: string[]) => void;
 }
 
-export function BrandSelector({ selectedBrands, onBrandsChange }: BrandSelectorProps) {
+export function BrandSelector({ selectedBrands, onBrandsChange, onSelectionChange }: BrandSelectorProps) {
+  const handleChange = (brands: string[]) => {
+    onBrandsChange?.(brands);
+    onSelectionChange?.(brands);
+  };
+
   const toggleBrand = (brandId: string) => {
     if (selectedBrands.includes(brandId)) {
-      onBrandsChange(selectedBrands.filter((id) => id !== brandId));
+      handleChange(selectedBrands.filter((id) => id !== brandId));
     } else {
-      onBrandsChange([...selectedBrands, brandId]);
+      handleChange([...selectedBrands, brandId]);
     }
   };
 
   const selectAll = () => {
-    onBrandsChange(BRANDS.map((b) => b.id));
+    handleChange(BRANDS.map((b) => b.id));
   };
 
   const clearAll = () => {
-    onBrandsChange([]);
+    handleChange([]);
   };
 
   return (
