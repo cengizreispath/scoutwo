@@ -7,30 +7,11 @@ import { createSearchSchema, updateSearchSchema } from '@/lib/validations';
 import { redis } from '@/lib/redis';
 import { Queue } from 'bullmq';
 
-// Parse REDIS_URL for BullMQ connection
-const getRedisConnection = () => {
-  const redisUrl = process.env.REDIS_URL;
-  if (redisUrl) {
-    try {
-      const url = new URL(redisUrl);
-      return {
-        host: url.hostname,
-        port: parseInt(url.port) || 6379,
-        password: url.password || undefined,
-        username: url.username !== 'default' ? url.username : undefined,
-      };
-    } catch {
-      // Fallback to localhost if URL parsing fails
-    }
-  }
-  return {
+const scrapeQueue = new Queue('scrape-queue', {
+  connection: {
     host: process.env.REDIS_HOST || 'localhost',
     port: parseInt(process.env.REDIS_PORT || '6379'),
-  };
-};
-
-const scrapeQueue = new Queue('scrape-queue', {
-  connection: getRedisConnection(),
+  },
 });
 
 export const searchesRouter = createTRPCRouter({
