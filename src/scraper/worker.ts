@@ -49,12 +49,17 @@ const worker = new Worker<ScrapeJobData>(
     try {
       // Update status to processing
       const redis = getRedis();
-      await redis.set(
-        `scrape:${searchId}:status`,
-        JSON.stringify({ status: 'processing', jobId: job.id }),
-        'EX',
-        3600
-      );
+      try {
+        await redis.set(
+          `scrape:${searchId}:status`,
+          JSON.stringify({ status: 'processing', jobId: job.id }),
+          'EX',
+          3600
+        );
+      } catch (redisError) {
+        console.error('[Worker] Failed to update Redis status to processing:', redisError);
+        // Continue anyway - status update is not critical
+      }
 
       // Process each brand
       for (const brand of jobBrands) {
@@ -139,12 +144,17 @@ const worker = new Worker<ScrapeJobData>(
       }
 
       // Update status to completed
-      await redis.set(
-        `scrape:${searchId}:status`,
-        JSON.stringify({ status: 'completed', jobId: job.id }),
-        'EX',
-        3600
-      );
+      try {
+        await redis.set(
+          `scrape:${searchId}:status`,
+          JSON.stringify({ status: 'completed', jobId: job.id }),
+          'EX',
+          3600
+        );
+      } catch (redisError) {
+        console.error('[Worker] Failed to update Redis status to completed:', redisError);
+        // Continue anyway - job is done successfully
+      }
 
       console.log(`[Worker] Completed scrape job for search ${searchId}`);
       
@@ -154,16 +164,21 @@ const worker = new Worker<ScrapeJobData>(
       
       // Update status to failed
       const redis = getRedis();
-      await redis.set(
-        `scrape:${searchId}:status`,
-        JSON.stringify({ 
-          status: 'failed', 
-          jobId: job.id,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        }),
-        'EX',
-        3600
-      );
+      try {
+        await redis.set(
+          `scrape:${searchId}:status`,
+          JSON.stringify({ 
+            status: 'failed', 
+            jobId: job.id,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          }),
+          'EX',
+          3600
+        );
+      } catch (redisError) {
+        console.error('[Worker] Failed to update Redis status to failed:', redisError);
+        // Continue anyway
+      }
       
       throw error;
     }
