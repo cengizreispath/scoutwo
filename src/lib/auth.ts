@@ -6,7 +6,7 @@ const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || 'fallback-secret-do-not-use-in-production'
 );
 
-export interface JWTPayload {
+export interface JWTPayload extends Record<string, unknown> {
   userId: string;
   email: string;
 }
