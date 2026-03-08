@@ -1,0 +1,19 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install dependencies
+COPY package.json package-lock.json* ./
+RUN npm install
+
+# Copy source files
+COPY . .
+
+# Install Playwright browsers
+RUN npx playwright install --with-deps chromium
+
+# Set environment
+ENV NODE_ENV=production
+
+# Run the worker
+CMD ["npm", "run", "scraper:worker"]
