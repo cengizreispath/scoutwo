@@ -132,37 +132,159 @@ const BRAND_SCRAPERS: Record<string, (page: Page, query: string) => Promise<Scra
 const genericScraper = async (page: Page, brandSlug: string, query: string): Promise<ScrapedProduct[]> => {
   console.log(`[Scraper] Using generic scraper for ${brandSlug}`);
   
-  // For now, return mock data for testing
-  // TODO: Implement real generic scraper or add more brand-specific scrapers
-  return [
-    {
-      externalId: `${brandSlug}-mock-${Date.now()}-1`,
-      name: `${query} - Mock Product 1 (${brandSlug})`,
-      price: '299.99',
-      currency: 'TRY',
-      imageUrl: 'https://via.placeholder.com/300x300?text=Product+1',
-      productUrl: `https://${brandSlug}.example.com/product-1`,
-      relevanceScore: 1.0,
-    },
-    {
-      externalId: `${brandSlug}-mock-${Date.now()}-2`,
-      name: `${query} - Mock Product 2 (${brandSlug})`,
-      price: '399.99',
-      currency: 'TRY',
-      imageUrl: 'https://via.placeholder.com/300x300?text=Product+2',
-      productUrl: `https://${brandSlug}.example.com/product-2`,
-      relevanceScore: 0.95,
-    },
-    {
-      externalId: `${brandSlug}-mock-${Date.now()}-3`,
-      name: `${query} - Mock Product 3 (${brandSlug})`,
-      price: '199.99',
-      currency: 'TRY',
-      imageUrl: 'https://via.placeholder.com/300x300?text=Product+3',
-      productUrl: `https://${brandSlug}.example.com/product-3`,
-      relevanceScore: 0.90,
-    },
-  ];
+  try {
+    // Common brand domains
+    const brandDomains: Record<string, string> = {
+      'puma': 'puma.com.tr',
+      'reebok': 'reebok.com.tr',
+      'new-balance': 'newbalance.com.tr',
+      'converse': 'converse.com.tr',
+      'vans': 'vans.com.tr',
+      'under-armour': 'underarmour.com.tr',
+      'asics': 'asics.com.tr',
+      'skechers': 'skechers.com.tr',
+      'fila': 'fila.com.tr',
+      'hummel': 'hummel.com.tr',
+      'le-coq-sportif': 'lecoqsportif.com.tr',
+      'diadora': 'diadora.com.tr',
+    };
+
+    const domain = brandDomains[brandSlug] || `${brandSlug}.com.tr`;
+    const searchUrl = `https://www.${domain}/search?q=${encodeURIComponent(query)}`;
+    
+    console.log(`[Scraper] Attempting to scrape ${searchUrl}`);
+    
+    await page.goto(searchUrl, {
+      waitUntil: 'networkidle',
+      timeout: 30000,
+    });
+
+    // Wait a bit for JS to render
+    await page.waitForTimeout(2000);
+
+    // Try to find common product card selectors
+    const productSelectors = [
+      '.product-card',
+      '.product-item',
+      '.product',
+      '.grid-item',
+      '[data-testid="product-card"]',
+      '[data-testid="product"]',
+      '.productCard',
+      '.ProductCard',
+      'article[data-product]',
+      '.c-product',
+      '.o-product',
+    ];
+
+    let productCards = null;
+    for (const selector of productSelectors) {
+      try {
+        await page.waitForSelector(selector, { timeout: 3000 });
+        productCards = await page.$$(selector);
+        if (productCards && productCards.length > 0) {
+          console.log(`[Scraper] Found ${productCards.length} products using selector: ${selector}`);
+          break;
+        }
+      } catch (e) {
+        // Try next selector
+      }
+    }
+
+    if (!productCards || productCards.length === 0) {
+      console.log(`[Scraper] No products found for ${brandSlug}`);
+      return [];
+    }
+
+    // Extract products using common patterns
+    const products = await page.evaluate((brandSlug) => {
+      const items: ScrapedProduct[] = [];
+      
+      // Common selectors for product elements
+      const selectors = {
+        card: ['.product-card', '.product-item', '.product', '.grid-item', '[data-testid="product-card"]', '.productCard', 'article'],
+        link: ['a[href*="/product"]', 'a', 'a[href*="/p/"]', 'a[href*="/item"]'],
+        name: ['.product-name', '.product-title', 'h3', 'h4', 'h2', '[data-testid="product-name"]', '.name', '.title'],
+        price: ['.product-price', '.price', '[data-testid="price"]', '.amount', '.current-price', '.sale-price'],
+        image: ['img'],
+      };
+
+      // Find all product cards
+      let cards: Element[] = [];
+      for (const selector of selectors.card) {
+        const found = Array.from(document.querySelectorAll(selector));
+        if (found.length > 0) {
+          cards = found;
+          break;
+        }
+      }
+
+      cards.forEach((card, index) => {
+        try {
+          // Find link
+          let linkEl: HTMLAnchorElement | null = null;
+          for (const selector of selectors.link) {
+            linkEl = card.querySelector(selector) as HTMLAnchorElement;
+            if (linkEl && linkEl.href) break;
+          }
+
+          // Find name
+          let nameEl: HTMLElement | null = null;
+          for (const selector of selectors.name) {
+            nameEl = card.querySelector(selector) as HTMLElement;
+            if (nameEl && nameEl.textContent?.trim()) break;
+          }
+
+          // Find price
+          let priceEl: HTMLElement | null = null;
+          for (const selector of selectors.price) {
+            priceEl = card.querySelector(selector) as HTMLElement;
+            if (priceEl && priceEl.textContent?.trim()) break;
+          }
+
+          // Find image
+          let imageEl: HTMLImageElement | null = null;
+          for (const selector of selectors.image) {
+            imageEl = card.querySelector(selector) as HTMLImageElement;
+            if (imageEl && (imageEl.src || imageEl.dataset.src)) break;
+          }
+
+          if (linkEl && nameEl && priceEl) {
+            const url = linkEl.href || '';
+            const productId = url.split('/').filter(Boolean).pop()?.split('?')[0] || `${brandSlug}-${Date.now()}-${index}`;
+            const priceText = priceEl.textContent?.trim() || '0';
+            
+            // Extract numeric price
+            const priceMatch = priceText.match(/[\d.,]+/);
+            const price = priceMatch ? priceMatch[0].replace(',', '.') : '0';
+
+            const imageUrl = imageEl?.src || imageEl?.dataset?.src || null;
+
+            items.push({
+              externalId: `${brandSlug}-${productId}`,
+              name: nameEl.textContent?.trim() || 'Unknown Product',
+              price: price || '0',
+              currency: 'TRY',
+              imageUrl: imageUrl,
+              productUrl: url,
+              relevanceScore: 1.0 - (index * 0.01),
+            });
+          }
+        } catch (err) {
+          console.error('Error extracting product:', err);
+        }
+      });
+
+      return items;
+    }, brandSlug);
+
+    console.log(`[Scraper] Extracted ${products.length} products from ${brandSlug}`);
+    return products;
+
+  } catch (error) {
+    console.error(`[Scraper] Generic scraper error for ${brandSlug}:`, error);
+    return [];
+  }
 };
 
 export async function scrapeProducts(
