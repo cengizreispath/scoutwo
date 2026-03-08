@@ -20,6 +20,7 @@ export const getRedis = (): Redis => {
       maxRetriesPerRequest: null,
       enableReadyCheck: false,
       enableOfflineQueue: true,
+      lazyConnect: true,
     });
   }
   return _redis!;
@@ -31,11 +32,26 @@ export const getRedisSubscriber = (): Redis => {
       maxRetriesPerRequest: null,
       enableReadyCheck: false,
       enableOfflineQueue: true,
+      lazyConnect: true,
     });
   }
   return _redisSubscriber!;
 };
 
-// Export singleton instances for direct usage
-export const redis = getRedis();
-export const redisSubscriber = getRedisSubscriber();
+// Create a proxy object that lazily initializes Redis only when methods are called
+const createLazyRedisProxy = (): Redis => {
+  return new Proxy({} as Redis, {
+    get(_target, prop) {
+      const redis = getRedis();
+      const value = (redis as any)[prop];
+      if (typeof value === 'function') {
+        return value.bind(redis);
+      }
+      return value;
+    },
+  });
+};
+
+// Export proxy instances that only connect when actually used
+export const redis = createLazyRedisProxy();
+export const redisSubscriber = createLazyRedisProxy();
