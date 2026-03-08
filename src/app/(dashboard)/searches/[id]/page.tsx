@@ -45,11 +45,13 @@ export default function SearchDetailPage() {
   });
 
   // Poll for scrape completion
-  if (scrapeStatus?.status === 'completed' && isRefreshing) {
-    setIsRefreshing(false);
-    refetchProducts();
-    toast({ title: 'Ürünler güncellendi!' });
-  }
+  useEffect(() => {
+    if (scrapeStatus?.status === 'completed' && isRefreshing) {
+      setIsRefreshing(false);
+      refetchProducts();
+      toast({ title: 'Ürünler güncellendi!' });
+    }
+  }, [scrapeStatus?.status, isRefreshing, refetchProducts]);
 
   if (searchLoading) {
     return (
