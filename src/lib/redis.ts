@@ -43,6 +43,17 @@ const createLazyRedisProxy = (): Redis => {
   return new Proxy({} as Redis, {
     get(_target, prop) {
       const redis = getRedis();
+      // Safety check: if redis is null, return a no-op function or throw a descriptive error
+      if (!redis) {
+        if (typeof prop === 'string' && ['set', 'get', 'del', 'exists'].includes(prop)) {
+          // Return a function that logs but doesn't crash
+          return async (...args: any[]) => {
+            console.warn(`[Redis] Operation "${prop}" skipped - Redis not initialized`);
+            return null;
+          };
+        }
+        return undefined;
+      }
       const value = (redis as any)[prop];
       if (typeof value === 'function') {
         return value.bind(redis);

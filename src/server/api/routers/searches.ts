@@ -201,13 +201,18 @@ export const searchesRouter = createTRPCRouter({
         })),
       });
 
-      // Store job status in Redis
-      await redis.set(
-        `scrape:${search.id}:status`,
-        JSON.stringify({ status: 'queued', jobId: job.id }),
-        'EX',
-        3600 // 1 hour TTL
-      );
+      // Store job status in Redis (with error handling for graceful degradation)
+      try {
+        await redis.set(
+          `scrape:${search.id}:status`,
+          JSON.stringify({ status: 'queued', jobId: job.id }),
+          'EX',
+          3600 // 1 hour TTL
+        );
+      } catch (error) {
+        console.error('[Redis] Failed to store scrape status:', error);
+        // Continue anyway - the job is queued, Redis status is just for tracking
+      }
 
       return { jobId: job.id, status: 'queued' };
     }),

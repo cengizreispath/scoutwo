@@ -26,8 +26,12 @@ export async function GET() {
   // Test Redis connection
   try {
     const redis = getRedis();
-    await redis.ping();
-    health.services.redis = 'connected';
+    if (redis) {
+      await redis.ping();
+      health.services.redis = 'connected';
+    } else {
+      health.services.redis = 'not_configured';
+    }
   } catch (error) {
     health.services.redis = 'disconnected';
     health.status = 'error';
