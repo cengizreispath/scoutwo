@@ -1,23 +1,23 @@
 'use client';
 
 import { useRouter, useParams } from 'next/navigation';
-import { SearchForm } from '@/components/search/SearchForm';
+import { ListForm } from '@/components/search/SearchForm';
 import { trpc } from '@/lib/trpc/client';
 import { toast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { CreateSearchInput } from '@/lib/validations';
+import type { CreateListInput } from '@/lib/validations';
 
-export default function EditSearchPage() {
+export default function EditListPage() {
   const params = useParams();
   const id = params.id as string;
   const router = useRouter();
   const utils = trpc.useUtils();
 
-  const { data: search, isLoading } = trpc.searches.getById.useQuery({ id });
+  const { data: list, isLoading } = trpc.searches.getById.useQuery({ id });
 
   const updateMutation = trpc.searches.update.useMutation({
     onSuccess: () => {
-      toast({ title: 'Arama güncellendi!' });
+      toast({ title: 'Liste güncellendi!' });
       utils.searches.list.invalidate();
       utils.searches.getById.invalidate({ id });
       router.push(`/searches/${id}`);
@@ -31,7 +31,7 @@ export default function EditSearchPage() {
     },
   });
 
-  const handleSubmit = (data: CreateSearchInput) => {
+  const handleSubmit = (data: CreateListInput) => {
     updateMutation.mutate({ id, data });
   };
 
@@ -44,20 +44,19 @@ export default function EditSearchPage() {
     );
   }
 
-  if (!search) {
-    return <div>Arama bulunamadı</div>;
+  if (!list) {
+    return <div>Liste bulunamadı</div>;
   }
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <h1 className="text-2xl font-bold">Aramayı Düzenle</h1>
-      <SearchForm
+      <h1 className="text-2xl font-bold">Listeyi Düzenle</h1>
+      <ListForm
         onSubmit={handleSubmit}
         isLoading={updateMutation.isPending}
         defaultValues={{
-          name: search.name,
-          query: search.query,
-          brandIds: search.searchBrands.map((sb) => sb.brand.id),
+          name: list.name,
+          description: '',
         }}
       />
     </div>
