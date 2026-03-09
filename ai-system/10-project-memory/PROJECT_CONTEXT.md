@@ -1,151 +1,70 @@
-# PROJECT_CONTEXT.md
-## Stable Project Runtime and Technical Context
+# PROJECT_CONTEXT.md - ScoutWo
 
----
+## Architecture
 
-## 1. Project Identity
+```
+scoutwo/
+├── src/
+│   ├── app/                 # Next.js App Router pages
+│   │   ├── page.tsx         # Homepage
+│   │   ├── searches/        # Search management
+│   │   └── api/             # API routes
+│   ├── components/          # React components
+│   ├── db/                  # Drizzle ORM schema
+│   ├── lib/                 # Utilities
+│   └── scraper/             # Playwright scraping logic
+├── ai-system/               # AI agent operating system
+├── drizzle/                 # Database migrations
+└── public/                  # Static assets
+```
 
-### Project Name
-ScoutWo
+## Database Schema
 
-### Repository Name
-cengizreispath/scoutwo
+### Tables
+- `brands` - Fashion brand definitions (name, slug, logo)
+- `categories` - Product categories
+- `searches` - User search configurations
+- `search_brands` - Many-to-many: searches ↔ brands
+- `search_categories` - Many-to-many: searches ↔ categories
+- `products` - Scraped products
+- `search_products` - Many-to-many: searches ↔ products
 
-### Business Purpose
-Kadınlar için akıllı alışveriş asistanı - birden fazla markayı tarayarak ürün karşılaştırması yapma
+## Scraper Architecture
 
-### Primary Stakeholders
-Cengiz Reis (Project Division)
+### Current Implementation
+- `src/scraper/scraper.ts` - Main scraper module
+- Uses Playwright for browser automation
+- Generic scraper with brand-specific domain mappings
+- Falls back to common CSS selectors for product extraction
 
----
+### Supported Brands (Turkish domains)
+- Zara: zara.com/tr
+- H&M: www2.hm.com/tr_tr
+- Mango: shop.mango.com/tr
+- Massimo Dutti: massimodutti.com/tr
+- Koton: koton.com
+- LC Waikiki: lcwaikiki.com/tr-TR/TR
+- Beymen: beymen.com
+- Network: network.com.tr
 
-## 2. Tech Stack
+### Known Limitations
+- Generic selectors may not work for all brands
+- Anti-bot measures on some sites
+- Search URL format varies by brand
 
-### Frontend
-- Next.js 14 (App Router)
-- React
-- Tailwind CSS
-- shadcn/ui components
+## API Endpoints
 
-### Backend
-- Next.js API Routes
-- tRPC
-- TypeScript
+- `GET /api/searches` - List all searches
+- `POST /api/searches` - Create new search
+- `GET /api/searches/[id]` - Get search details
+- `GET /api/searches/[id]/products` - Get products for search
+- `POST /api/searches/[id]/scrape` - Trigger product scraping
 
-### Database
-- PostgreSQL (Drizzle ORM)
-- Coolify managed: `z0kc4g0o0gog84sgkg0ggg8g`
+## Environment Variables
 
-### Cache / Queue / Workers
-- Redis (BullMQ job queue)
-- Coolify managed: `m4kwsksgwoc48c8wggs8ckc4`
-- Separate worker container for job processing
+Required:
+- `DATABASE_URL` - PostgreSQL connection string
+- `REDIS_URL` - Redis connection string
 
-### Infrastructure / Hosting
-- Coolify (self-hosted on Hetzner)
-- Domain: dotthedoor.com
-
-### CI/CD
-- GitHub → Coolify auto-deploy on push to main
-
-### Observability
-- /api/health endpoint (DB + Redis status)
-- Coolify deployment logs
-
----
-
-## 3. Environments
-
-### Production
-- URL: https://scoutwo.dotthedoor.com
-- Auto-deploy from main branch
-- Real user data
-
----
-
-## 4. Services Map
-
-| Service | Purpose | Runtime / Image | Port | Depends On | Coolify App ID |
-|---------|---------|-----------------|------|------------|----------------|
-| scoutwo | Web app (Next.js) | node:20 | 3000 | PostgreSQL, Redis | n0gwgwookgg48cs8o880kss0 |
-| scoutwo-worker | BullMQ job processor | node:20-bookworm-slim | - | PostgreSQL, Redis | ss8cgsocokw8kkwk4w88okw8 |
-| PostgreSQL | Database | postgres:15 | 5432 | - | z0kc4g0o0gog84sgkg0ggg8g |
-| Redis | Job queue | redis:7 | 6379 | - | m4kwsksgwoc48c8wggs8ckc4 |
-
----
-
-## 5. Deployment Topology
-
-### Hosting Model
-Coolify on single Hetzner VPS (89.167.11.39)
-
-### Coolify Mapping
-
-| Coolify App | Purpose | Domain | Notes |
-|-------------|---------|--------|-------|
-| scoutwo | Main web app | scoutwo.dotthedoor.com | Next.js |
-| scoutwo-worker | Job processor | - (no domain) | Dockerfile.worker, Debian base |
-
-### Reverse Proxy / Routing
-Traefik (Coolify managed)
-
-### Build / Deploy Triggers
-Push to main → Coolify webhook → auto-deploy
-
-### Health Checks
-- Web: `GET /api/health` → `{"status":"ok","services":{"database":"connected","redis":"connected"}}`
-
-### Rollback Strategy
-Coolify deployment history → redeploy previous version
-
----
-
-## 6. Data and Integrations
-
-### Databases
-- PostgreSQL: users, searches, products, brands
-
-### External APIs
-- Brand websites (Nike, Adidas, etc.) via Playwright scraping
-
-### Authentication
-- NextAuth.js with JWT
-- Cookie-based sessions
-
----
-
-## 7. Critical Paths
-
-1. **User Authentication** - Login/register flow
-2. **Search Creation** - Brand selection, query input
-3. **Product Scraping** - "Ürünleri Listele" → BullMQ job → Playwright → DB
-4. **Product Display** - Fetching and rendering scraped products
-
----
-
-## 8. Operational Constraints
-
-- Worker MUST use Debian-based image (not Alpine) for Playwright
-- Redis connection requires REDIS_URL parsing (not REDIS_HOST/PORT)
-- Worker is separate container, must be deployed independently
-- Coolify network: services communicate via container names
-
----
-
-## 9. Fragile Areas / Known Technical Sensitivities
-
-1. **Worker Deployment** - Often forgotten, separate from main app
-2. **Dockerfile.worker** - Must be Debian (node:20-bookworm-slim) for Playwright
-3. **Redis URL parsing** - BullMQ needs host/port extracted from REDIS_URL
-4. **Brand scraping selectors** - May break if website HTML changes
-
----
-
-## 10. Agent Working Rules for This Context
-
-When working on ScoutWo:
-1. ALWAYS check if worker deployment is needed
-2. ALWAYS verify Dockerfile.worker uses Debian base
-3. ALWAYS parse REDIS_URL for BullMQ connections
-4. Test scraping functionality end-to-end after changes
-5. Check both scoutwo AND scoutwo-worker Coolify apps
+Optional:
+- `PLAYWRIGHT_HEADLESS` - Run browser headless (default: true)

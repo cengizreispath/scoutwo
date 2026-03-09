@@ -1,112 +1,38 @@
-# PROJECT_BRIEF.md
-## Purpose
+# PROJECT_BRIEF.md - ScoutWo
 
----
+## Project Identity
+- **Name:** ScoutWo
+- **Domain:** scoutwo.dotthedoor.com
+- **Repository:** github.com/cengizreispath/scoutwo
+- **Type:** E-commerce Product Scout / Shopping Assistant
 
-## 1. Project Summary
+## Description
+ScoutWo is an intelligent shopping assistant for women's fashion. It helps users:
+- Create searches with specific criteria (brand, category, price range)
+- Scrape products from multiple fashion brand websites
+- Compare products across brands
+- Track price changes
 
-### Project Name
-ScoutWo
+## Tech Stack
+- **Frontend:** Next.js 14, TypeScript, Tailwind CSS
+- **Backend:** Next.js API Routes
+- **Database:** PostgreSQL (Drizzle ORM)
+- **Cache:** Redis
+- **Scraping:** Playwright
+- **Deployment:** Coolify on dotthedoor.com
 
-### One-Sentence Description
-Kadınlar için birden fazla markayı tek arayüzden tarayan akıllı alışveriş asistanı
+## Infrastructure
+- **Coolify App ID:** n0gwgwookgg48cs8o880kss0
+- **Coolify DB ID:** z0kc4g0o0gog84sgkg0ggg8g
+- **Coolify Redis ID:** m4kwsksgwoc48c8wggs8ckc4
 
-### Business Objective
-Kullanıcıların Nike, Adidas gibi markaları tek tek gezmek yerine, tek bir arayüzden arama yapıp karşılaştırma yapabilmesi
+## Key Features
+1. Search creation with brand/category/price filters
+2. Product scraping from fashion brands (Zara, H&M, Mango, Koton, LC Waikiki, Beymen, Network)
+3. Product comparison and listing
+4. User authentication (planned)
 
-### Desired Outcome
-- Kullanıcı arama oluşturur, markalar seçer
-- "Ürünleri Listele" tıklar
-- Tüm markalardan ürünler taranır ve gösterilir
-- Fiyat/görsel karşılaştırması yapılabilir
-
-### Primary Users
-- E-ticaret alışverişi yapan kullanıcılar (öncelikle kadınlar)
-
-### Main Stakeholders
-- Cengiz Reis (Product Owner)
-
----
-
-## 2. Business Context
-
-### Problem Being Solved
-Farklı markaların sitelerini tek tek gezip ürün aramak zaman alıcı
-
-### Why It Matters Now
-AI Development Pipeline POC projesi olarak kullanılıyor
-
-### Expected Business Value
-- Zaman tasarrufu
-- Daha iyi alışveriş kararları
-- AI pipeline test platformu
-
-### Success Metrics
-- Arama oluşturma → Ürün listeleme akışının çalışması
-- Gerçek ürün verilerinin görüntülenmesi
-
----
-
-## 3. Scope
-
-### In Scope
-- Kullanıcı kaydı/girişi
-- Arama oluşturma (sorgu + marka seçimi)
-- Ürün scraping (Playwright)
-- Ürün listeleme ve görüntüleme
-
-### Out of Scope
-- Ödeme sistemi
-- Satın alma yönlendirmesi
-- Mobil uygulama
-
-### Assumptions
-- Marka siteleri scraping'e izin veriyor veya tolere ediyor
-- Playwright headless browser çalışıyor
-
-### Constraints
-- Single VPS hosting (Coolify)
-- Limited scraping rate (spam önleme)
-
----
-
-## 4. Product and Delivery Priorities
-
-### Priority Order
-1. İşlevsellik (scraping çalışsın)
-2. Güvenilirlik (hatalar handle edilsin)
-3. Hız (reasonable response times)
-4. Kod kalitesi
-
-### Trade-Off Guidance
-- MVP öncelikli - polish sonra
-- Scraping çalışsın, edge case'ler sonra
-
----
-
-## 5. Current Focus
-
-### Active Milestone
-AI Pipeline POC - Tek agent, süreç bazlı çalışma testi
-
-### Current High-Priority Objectives
-1. "Ürünleri Listele" butonu tam çalışsın
-2. Gerçek ürünler görüntülensin (mock değil)
-
-### Current Delivery Risks
-- Worker deployment unutulabilir
-- Scraping selectors kırılabilir
-
----
-
-## 6. Definition of Success for the Current Stage
-
-**Success:**
-- Kullanıcı arama oluşturur
-- "Ürünleri Listele" tıklar
-- Gerçek Nike/Adidas ürünleri görüntülenir
-
-**Failure:**
-- Buton çalışmaz
-- Mock data görünür
-- Worker crash
+## Current Status
+- MVP deployed and functional
+- Scraper needs brand-specific configurations for better accuracy
+- UI working for search creation and product listing
