@@ -2,8 +2,8 @@ import { z } from 'zod';
 import { eq, and, desc } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { createTRPCRouter, protectedProcedure } from '../trpc';
-import { searches, searchBrands, brands } from '@/server/db/schema';
-import { createSearchSchema, updateSearchSchema } from '@/lib/validations';
+import { searches, searchBrands, brands, listItems } from '@/server/db/schema';
+import { createListSchema, updateListSchema, addProductUrlSchema, removeProductUrlSchema, createSearchSchema, updateSearchSchema } from '@/lib/validations';
 import { redis } from '@/lib/redis';
 import { Queue } from 'bullmq';
 
@@ -80,22 +80,22 @@ export const searchesRouter = createTRPCRouter({
     }),
 
   create: protectedProcedure
-    .input(createSearchSchema)
+    .input(createSearchSchema.or(createListSchema))
     .mutation(async ({ ctx, input }) => {
       const [newSearch] = await ctx.db
         .insert(searches)
         .values({
           userId: ctx.session.userId,
           name: input.name,
-          query: input.query,
+          query: 'query' in input ? input.query : '',
         })
         .returning();
 
-      // Insert brand associations - convert slugs to UUIDs
-      if (input.brandIds.length > 0) {
+      // Insert brand associations - convert slugs to UUIDs (only if brandIds provided)
+      if ('brandIds' in input && input.brandIds && input.brandIds.length > 0) {
         // Get brand UUIDs from slugs
         const brandRecords = await ctx.db.query.brands.findMany({
-          where: (brands, { inArray }) => inArray(brands.slug, input.brandIds),
+          where: (brands, { inArray }) => inArray(brands.slug, input.brandIds!),
         });
 
         if (brandRecords.length > 0) {
@@ -254,5 +254,121 @@ export const searchesRouter = createTRPCRouter({
           message: 'Ürün tarama işlemi başlatılamadı. Lütfen daha sonra tekrar deneyin.',
         });
       }
+    }),
+
+  // NEW: Add product URL to list (comparison lists feature)
+  addProductUrl: protectedProcedure
+    .input(addProductUrlSchema)
+    .mutation(async ({ ctx, input }) => {
+      // Verify list ownership
+      const list = await ctx.db.query.searches.findFirst({
+        where: and(
+          eq(searches.id, input.listId),
+          eq(searches.userId, ctx.session.userId)
+        ),
+      });
+
+      if (!list) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Liste bulunamadı',
+        });
+      }
+
+      // Create list item with pending status
+      const [newListItem] = await ctx.db
+        .insert(listItems)
+        .values({
+          listId: input.listId,
+          productUrl: input.productUrl,
+          status: 'pending',
+        })
+        .returning();
+
+      // Queue scraping job for this URL
+      try {
+        await scrapeQueue.add('scrape-product-url', {
+          listItemId: newListItem.id,
+          productUrl: input.productUrl,
+          listId: input.listId,
+        });
+      } catch (error) {
+        console.error('[BullMQ] Failed to queue product URL scrape:', error);
+        // Update list item status to failed
+        await ctx.db
+          .update(listItems)
+          .set({
+            status: 'failed',
+            errorMessage: 'Ürün bilgileri alınamadı. Lütfen daha sonra tekrar deneyin.',
+          })
+          .where(eq(listItems.id, newListItem.id));
+
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Ürün eklenemedi. Lütfen daha sonra tekrar deneyin.',
+        });
+      }
+
+      return newListItem;
+    }),
+
+  // NEW: Remove product URL from list
+  removeProductUrl: protectedProcedure
+    .input(removeProductUrlSchema)
+    .mutation(async ({ ctx, input }) => {
+      // Get list item and verify ownership
+      const listItem = await ctx.db.query.listItems.findFirst({
+        where: eq(listItems.id, input.listItemId),
+        with: {
+          list: true,
+        },
+      });
+
+      if (!listItem || listItem.list.userId !== ctx.session.userId) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Ürün bulunamadı',
+        });
+      }
+
+      // Delete list item
+      await ctx.db.delete(listItems).where(eq(listItems.id, input.listItemId));
+
+      return { success: true };
+    }),
+
+  // NEW: Get list items (products added by URL)
+  getListItems: protectedProcedure
+    .input(z.object({ listId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      // Verify list ownership
+      const list = await ctx.db.query.searches.findFirst({
+        where: and(
+          eq(searches.id, input.listId),
+          eq(searches.userId, ctx.session.userId)
+        ),
+      });
+
+      if (!list) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Liste bulunamadı',
+        });
+      }
+
+      // Get all list items with their products
+      const items = await ctx.db.query.listItems.findMany({
+        where: eq(listItems.listId, input.listId),
+        orderBy: [desc(listItems.createdAt)],
+        with: {
+          product: {
+            with: {
+              brand: true,
+            },
+          },
+        },
+      });
+
+      return items;
     }),
 });

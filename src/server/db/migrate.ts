@@ -105,6 +105,46 @@ export async function runMigrations() {
       ON CONFLICT (slug) DO NOTHING
     `);
 
+    // Migration: Transform to comparison lists
+    console.log('Running comparison lists migration...');
+    
+    // 1. Create list_items table
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS list_items (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        list_id UUID REFERENCES searches(id) ON DELETE CASCADE NOT NULL,
+        product_url TEXT NOT NULL,
+        product_id UUID REFERENCES products(id),
+        status TEXT DEFAULT 'pending' NOT NULL,
+        error_message TEXT,
+        scraped_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL
+      )
+    `);
+
+    // 2. Create indexes for performance
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_list_items_list_id ON list_items(list_id)
+    `);
+    
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_list_items_status ON list_items(status)
+    `);
+
+    // 3. Make query field optional in searches (allow NULL)
+    await db.execute(sql`
+      ALTER TABLE searches ALTER COLUMN query DROP NOT NULL
+    `);
+    
+    await db.execute(sql`
+      ALTER TABLE searches ALTER COLUMN query SET DEFAULT ''
+    `);
+
+    // 4. Update existing searches to have empty query if NULL
+    await db.execute(sql`
+      UPDATE searches SET query = '' WHERE query IS NULL
+    `);
+
     console.log('Migrations completed successfully!');
     return true;
   } catch (error) {

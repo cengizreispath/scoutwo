@@ -297,6 +297,203 @@ const genericScraper = async (page: Page, brandSlug: string, query: string): Pro
   }
 };
 
+// NEW: Scrape single product URL (for comparison lists)
+export async function scrapeProductUrl(
+  productUrl: string
+): Promise<ScrapedProduct | null> {
+  const startTime = Date.now();
+  console.log(`[Scraper] ▶ Starting single product scrape for URL: ${productUrl}`);
+
+  let browser: Browser | null = null;
+  try {
+    // Extract domain for brand detection
+    const url = new URL(productUrl);
+    const domain = url.hostname.replace('www.', '').replace('www2.', '').replace('shop.', '');
+    
+    console.log(`[Scraper] Launching Chromium browser for ${domain}...`);
+    browser = await chromium.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+      ],
+    });
+
+    const context = await browser.newContext({
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      viewport: { width: 1920, height: 1080 },
+    });
+
+    const page = await context.newPage();
+    
+    // Navigate to product URL
+    await page.goto(productUrl, {
+      waitUntil: 'networkidle',
+      timeout: 30000,
+    });
+
+    // Wait a bit for JS to render
+    await page.waitForTimeout(2000);
+
+    // Extract product data using multiple strategies
+    const product = await page.evaluate((url) => {
+      // Strategy 1: Open Graph meta tags
+      const getMetaContent = (property: string): string | null => {
+        const meta = document.querySelector(`meta[property="${property}"], meta[name="${property}"]`);
+        return meta?.getAttribute('content') || null;
+      };
+
+      const ogTitle = getMetaContent('og:title');
+      const ogImage = getMetaContent('og:image');
+      const ogPriceAmount = getMetaContent('og:price:amount') || getMetaContent('product:price:amount');
+      const ogPriceCurrency = getMetaContent('og:price:currency') || getMetaContent('product:price:currency');
+
+      // Strategy 2: JSON-LD structured data
+      let jsonLdData: any = null;
+      const jsonLdScripts = Array.from(document.querySelectorAll('script[type="application/ld+json"]'));
+      for (const script of jsonLdScripts) {
+        try {
+          const data = JSON.parse(script.textContent || '');
+          if (data['@type'] === 'Product' || (Array.isArray(data) && data.some((d: any) => d['@type'] === 'Product'))) {
+            jsonLdData = Array.isArray(data) ? data.find((d: any) => d['@type'] === 'Product') : data;
+            break;
+          }
+        } catch (e) {
+          // Invalid JSON, skip
+        }
+      }
+
+      // Strategy 3: Common CSS selectors
+      const titleSelectors = [
+        'h1[itemprop="name"]',
+        '[itemprop="name"]',
+        'h1.product-title',
+        'h1.product-name',
+        '.product-title',
+        '.product-name',
+        'h1',
+      ];
+
+      const priceSelectors = [
+        '[itemprop="price"]',
+        '.product-price',
+        '.price',
+        '[data-testid="price"]',
+        '.current-price',
+        '.sale-price',
+        '.amount',
+      ];
+
+      const imageSelectors = [
+        'img[itemprop="image"]',
+        '.product-image img',
+        '.main-image img',
+        '[data-testid="product-image"]',
+        'img[alt*="Product"]',
+        'picture img',
+      ];
+
+      let name = ogTitle || jsonLdData?.name || document.title;
+      let price = ogPriceAmount;
+      let currency = ogPriceCurrency || 'TRY';
+      let imageUrl = ogImage;
+
+      // Try JSON-LD data
+      if (jsonLdData) {
+        name = name || jsonLdData.name;
+        if (jsonLdData.offers) {
+          const offer = Array.isArray(jsonLdData.offers) ? jsonLdData.offers[0] : jsonLdData.offers;
+          price = price || offer.price;
+          currency = currency || offer.priceCurrency || 'TRY';
+        }
+        imageUrl = imageUrl || jsonLdData.image || (Array.isArray(jsonLdData.image) ? jsonLdData.image[0] : null);
+      }
+
+      // Fallback to CSS selectors
+      if (!name) {
+        for (const selector of titleSelectors) {
+          const el = document.querySelector(selector);
+          if (el && el.textContent?.trim()) {
+            name = el.textContent.trim();
+            break;
+          }
+        }
+      }
+
+      if (!price) {
+        for (const selector of priceSelectors) {
+          const el = document.querySelector(selector);
+          if (el) {
+            const priceText = el.textContent?.trim() || el.getAttribute('content') || '';
+            const priceMatch = priceText.match(/[\d.,]+/);
+            if (priceMatch) {
+              price = priceMatch[0].replace(',', '.');
+              break;
+            }
+          }
+        }
+      }
+
+      if (!imageUrl) {
+        for (const selector of imageSelectors) {
+          const el = document.querySelector(selector) as HTMLImageElement;
+          if (el && (el.src || el.dataset.src)) {
+            imageUrl = el.src || el.dataset.src || null;
+            break;
+          }
+        }
+      }
+
+      // Generate external ID from URL
+      const urlParts = url.split('/').filter(Boolean);
+      const externalId = urlParts[urlParts.length - 1]?.split('?')[0] || `product-${Date.now()}`;
+
+      if (!name || !price) {
+        return null;
+      }
+
+      return {
+        externalId: externalId,
+        name: name,
+        price: price,
+        currency: currency,
+        imageUrl: imageUrl,
+        productUrl: url,
+      };
+    }, productUrl);
+
+    await context.close();
+    
+    const duration = Date.now() - startTime;
+    
+    if (product) {
+      console.log(`[Scraper] ✓ Product scraped successfully in ${duration}ms: ${product.name}`);
+      return product;
+    } else {
+      console.log(`[Scraper] ✗ Could not extract product data from ${productUrl} in ${duration}ms`);
+      return null;
+    }
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`[Scraper] ✗ Error scraping product URL after ${duration}ms:`, error);
+    if (error instanceof Error) {
+      console.error(`[Scraper] Error stack:`, error.stack);
+    }
+    return null;
+  } finally {
+    if (browser) {
+      try {
+        await browser.close();
+        console.log(`[Scraper] Browser closed`);
+      } catch (err) {
+        console.error(`[Scraper] Error closing browser:`, err);
+      }
+    }
+  }
+}
+
 export async function scrapeProducts(
   brandSlug: string,
   query: string

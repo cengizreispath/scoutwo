@@ -1,9 +1,9 @@
 import { Worker, Job } from 'bullmq';
 import { db } from '@/server/db';
-import { products, searchResults, searchBrands } from '@/server/db/schema';
+import { products, searchResults, searchBrands, listItems, brands } from '@/server/db/schema';
 import { eq } from 'drizzle-orm';
 import { getRedis } from '@/lib/redis';
-import { scrapeProducts } from './scraper';
+import { scrapeProducts, scrapeProductUrl } from './scraper';
 
 // Parse Redis connection from REDIS_URL or fallback to host/port
 const getRedisConnection = () => {
@@ -206,6 +206,171 @@ worker.on('active', (job) => {
   console.log(`[Worker] → Job ${job.id} started processing`);
 });
 
+// NEW: Worker for scraping individual product URLs (comparison lists feature)
+interface ScrapeProductUrlJobData {
+  listItemId: string;
+  productUrl: string;
+  listId: string;
+}
+
+const productUrlWorker = new Worker<ScrapeProductUrlJobData>(
+  'scrape-queue',
+  async (job: Job<ScrapeProductUrlJobData>) => {
+    const { listItemId, productUrl, listId } = job.data;
+    
+    // Only process scrape-product-url jobs
+    if (job.name !== 'scrape-product-url') {
+      return;
+    }
+    
+    console.log(`[ProductUrlWorker] Processing scrape for list item ${listItemId}`);
+    
+    try {
+      // Scrape product from URL
+      const scrapedProduct = await scrapeProductUrl(productUrl);
+      
+      if (!scrapedProduct) {
+        // Update list item status to failed
+        await db
+          .update(listItems)
+          .set({
+            status: 'failed',
+            errorMessage: 'Ürün bilgileri çıkarılamadı. Lütfen geçerli bir ürün sayfası URL\'i girin.',
+            scrapedAt: new Date(),
+          })
+          .where(eq(listItems.id, listItemId));
+        
+        console.log(`[ProductUrlWorker] Failed to scrape product from ${productUrl}`);
+        return { success: false, error: 'Could not extract product data' };
+      }
+      
+      console.log(`[ProductUrlWorker] Successfully scraped: ${scrapedProduct.name}`);
+      
+      // Extract domain for brand detection/creation
+      const url = new URL(productUrl);
+      const domain = url.hostname.replace('www.', '').replace('www2.', '').replace('shop.', '');
+      
+      // Try to find existing brand by domain, or create a new one
+      let brand = await db.query.brands.findFirst({
+        where: (brands, { like }) => like(brands.websiteUrl, `%${domain}%`),
+      });
+      
+      if (!brand) {
+        // Create new brand from domain
+        const brandName = domain.split('.')[0];
+        const [newBrand] = await db
+          .insert(brands)
+          .values({
+            name: brandName.charAt(0).toUpperCase() + brandName.slice(1),
+            slug: brandName.toLowerCase(),
+            websiteUrl: `https://${domain}`,
+            isActive: true,
+          })
+          .returning();
+        
+        brand = newBrand;
+        console.log(`[ProductUrlWorker] Created new brand: ${brand.name}`);
+      }
+      
+      // Check if product already exists
+      const existingProduct = await db.query.products.findFirst({
+        where: eq(products.externalId, scrapedProduct.externalId),
+      });
+
+      let productId: string;
+
+      if (existingProduct) {
+        // Update existing product
+        const [updated] = await db
+          .update(products)
+          .set({
+            name: scrapedProduct.name,
+            price: scrapedProduct.price,
+            imageUrl: scrapedProduct.imageUrl,
+            productUrl: scrapedProduct.productUrl,
+            updatedAt: new Date(),
+          })
+          .where(eq(products.id, existingProduct.id))
+          .returning();
+        
+        productId = updated.id;
+        console.log(`[ProductUrlWorker] Updated existing product: ${productId}`);
+      } else {
+        // Insert new product
+        const [inserted] = await db
+          .insert(products)
+          .values({
+            brandId: brand.id,
+            externalId: scrapedProduct.externalId,
+            name: scrapedProduct.name,
+            price: scrapedProduct.price,
+            currency: scrapedProduct.currency || 'TRY',
+            imageUrl: scrapedProduct.imageUrl,
+            productUrl: scrapedProduct.productUrl,
+          })
+          .returning();
+        
+        productId = inserted.id;
+        console.log(`[ProductUrlWorker] Created new product: ${productId}`);
+      }
+      
+      // Update list item status to scraped and link to product
+      await db
+        .update(listItems)
+        .set({
+          status: 'scraped',
+          productId: productId,
+          scrapedAt: new Date(),
+          errorMessage: null,
+        })
+        .where(eq(listItems.id, listItemId));
+      
+      console.log(`[ProductUrlWorker] Completed scrape for list item ${listItemId}`);
+      
+      return { success: true, productId };
+    } catch (error) {
+      console.error('[ProductUrlWorker] Job failed:', error);
+      
+      // Update list item status to failed
+      try {
+        await db
+          .update(listItems)
+          .set({
+            status: 'failed',
+            errorMessage: error instanceof Error ? error.message : 'Bilinmeyen bir hata oluştu',
+            scrapedAt: new Date(),
+          })
+          .where(eq(listItems.id, listItemId));
+      } catch (updateError) {
+        console.error('[ProductUrlWorker] Failed to update list item status:', updateError);
+      }
+      
+      throw error;
+    }
+  },
+  {
+    connection: getRedisConnection(),
+    concurrency: 2, // Process 2 jobs at a time
+  }
+);
+
+productUrlWorker.on('completed', (job) => {
+  console.log(`[ProductUrlWorker] ✓ Job ${job.id} completed successfully`);
+});
+
+productUrlWorker.on('failed', (job, err) => {
+  console.error(`[ProductUrlWorker] ✗ Job ${job?.id} failed:`, err);
+  console.error(`[ProductUrlWorker] Job data:`, JSON.stringify(job?.data, null, 2));
+});
+
+productUrlWorker.on('error', (err) => {
+  console.error('[ProductUrlWorker] ⚠ Worker error:', err);
+});
+
+productUrlWorker.on('active', (job) => {
+  console.log(`[ProductUrlWorker] → Job ${job.id} started processing`);
+});
+
 // Verify Playwright is available
 async function verifyPlaywright() {
   try {
@@ -239,13 +404,13 @@ logWorkerStatus().catch(console.error);
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
-  console.log('[Worker] SIGTERM received, closing worker...');
-  await worker.close();
+  console.log('[Worker] SIGTERM received, closing workers...');
+  await Promise.all([worker.close(), productUrlWorker.close()]);
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
-  console.log('[Worker] SIGINT received, closing worker...');
-  await worker.close();
+  console.log('[Worker] SIGINT received, closing workers...');
+  await Promise.all([worker.close(), productUrlWorker.close()]);
   process.exit(0);
 });

@@ -6,43 +6,37 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
-import { BrandSelector } from './BrandSelector';
-import { createSearchSchema, type CreateSearchInput } from '@/lib/validations';
+import { createListSchema, type CreateListInput } from '@/lib/validations';
 import { Loader2 } from 'lucide-react';
 
-interface SearchFormProps {
-  onSubmit: (data: CreateSearchInput) => void;
+interface ListFormProps {
+  onSubmit: (data: CreateListInput) => void;
   isLoading?: boolean;
-  defaultValues?: Partial<CreateSearchInput>;
+  defaultValues?: Partial<CreateListInput>;
 }
 
-export function SearchForm({ onSubmit, isLoading, defaultValues }: SearchFormProps) {
+export function ListForm({ onSubmit, isLoading, defaultValues }: ListFormProps) {
   const {
     register,
     handleSubmit,
-    watch,
-    setValue,
     formState: { errors },
-  } = useForm<CreateSearchInput>({
-    resolver: zodResolver(createSearchSchema),
+  } = useForm<CreateListInput>({
+    resolver: zodResolver(createListSchema),
     defaultValues: {
       name: defaultValues?.name ?? '',
-      query: defaultValues?.query ?? '',
-      brandIds: defaultValues?.brandIds ?? [],
+      description: defaultValues?.description ?? '',
     },
   });
-
-  const selectedBrands = watch('brandIds');
 
   return (
     <Card>
       <CardContent className="pt-6">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="name">Arama Adı</Label>
+            <Label htmlFor="name">Liste Adı</Label>
             <Input
               id="name"
-              placeholder="Örn: Yazlık Elbiseler"
+              placeholder="Örn: Yaz Alışverişi"
               {...register('name')}
             />
             {errors.name && (
@@ -51,30 +45,20 @@ export function SearchForm({ onSubmit, isLoading, defaultValues }: SearchFormPro
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="query">Arama Kelimesi</Label>
+            <Label htmlFor="description">Açıklama (Opsiyonel)</Label>
             <Input
-              id="query"
-              placeholder="Örn: keten pantolon"
-              {...register('query')}
+              id="description"
+              placeholder="Bu liste hakkında kısa bir açıklama"
+              {...register('description')}
             />
-            {errors.query && (
-              <p className="text-sm text-destructive">{errors.query.message}</p>
+            {errors.description && (
+              <p className="text-sm text-destructive">{errors.description.message}</p>
             )}
           </div>
 
-          <div className="space-y-2">
-            <Label>Markalar</Label>
-            <p className="text-sm text-muted-foreground">
-              En az 1, en fazla 10 marka seçebilirsiniz
-            </p>
-            <BrandSelector
-              selectedBrands={selectedBrands}
-              onSelectionChange={(brands) => setValue('brandIds', brands)}
-            />
-            {errors.brandIds && (
-              <p className="text-sm text-destructive">{errors.brandIds.message}</p>
-            )}
-          </div>
+          <p className="text-sm text-muted-foreground">
+            💡 Liste oluşturduktan sonra ürün linklerini ekleyebilirsiniz
+          </p>
 
           <Button type="submit" className="w-full" disabled={isLoading}>
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -85,3 +69,6 @@ export function SearchForm({ onSubmit, isLoading, defaultValues }: SearchFormPro
     </Card>
   );
 }
+
+// Keep SearchForm as alias for backward compatibility during migration
+export const SearchForm = ListForm;

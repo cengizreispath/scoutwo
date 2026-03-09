@@ -46,11 +46,11 @@ export default function SearchesPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Aramalarım</h1>
+        <h1 className="text-2xl font-bold">Listelerim</h1>
         <Link href="/searches/new">
           <Button>
             <Plus className="mr-2 h-4 w-4" />
-            Yeni Arama
+            Yeni Liste
           </Button>
         </Link>
       </div>
@@ -58,14 +58,14 @@ export default function SearchesPage() {
       {searches?.length === 0 ? (
         <Card className="flex flex-col items-center justify-center py-16">
           <Search className="mb-4 h-12 w-12 text-muted-foreground" />
-          <h2 className="mb-2 text-xl font-semibold">Henüz arama yok</h2>
+          <h2 className="mb-2 text-xl font-semibold">Henüz liste yok</h2>
           <p className="mb-6 text-muted-foreground">
-            İlk aramanızı oluşturarak başlayın
+            İlk listenizi oluşturarak başlayın
           </p>
           <Link href="/searches/new">
             <Button>
               <Plus className="mr-2 h-4 w-4" />
-              Yeni Arama Oluştur
+              Yeni Liste Oluştur
             </Button>
           </Link>
         </Card>
@@ -77,7 +77,7 @@ export default function SearchesPage() {
                 <CardHeader>
                   <CardTitle className="line-clamp-1">{search.name}</CardTitle>
                   <CardDescription>
-                    Arama: &quot;{search.query}&quot;
+                    {search.query || 'Ürün karşılaştırma listesi'}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>

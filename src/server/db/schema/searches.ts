@@ -7,7 +7,7 @@ export const searches = pgTable('searches', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
   name: text('name').notNull(),
-  query: text('query').notNull(),
+  query: text('query').default(''), // Made optional - no longer used for comparison lists
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -25,6 +25,7 @@ export const searchesRelations = relations(searches, ({ one, many }) => ({
     references: [users.id],
   }),
   searchBrands: many(searchBrands),
+  listItems: many('listItems'), // New relation for comparison lists
 }));
 
 export const searchBrandsRelations = relations(searchBrands, ({ one }) => ({
