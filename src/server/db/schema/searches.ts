@@ -25,7 +25,7 @@ export const searchesRelations = relations(searches, ({ one, many }) => ({
     references: [users.id],
   }),
   searchBrands: many(searchBrands),
-  listItems: many('listItems'), // New relation for comparison lists
+  // listItems relation is defined in list-items.ts to avoid circular import
 }));
 
 export const searchBrandsRelations = relations(searchBrands, ({ one }) => ({
