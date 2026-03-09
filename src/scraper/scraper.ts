@@ -301,7 +301,8 @@ export async function scrapeProducts(
   brandSlug: string,
   query: string
 ): Promise<ScrapedProduct[]> {
-  console.log(`[Scraper] Starting scrape for ${brandSlug} with query: ${query}`);
+  const startTime = Date.now();
+  console.log(`[Scraper] ▶ Starting scrape for ${brandSlug} with query: "${query}"`);
   
   // Check if we have a specific scraper for this brand
   const brandScraper = BRAND_SCRAPERS[brandSlug.toLowerCase()];
@@ -309,34 +310,62 @@ export async function scrapeProducts(
   // Real scraping with Playwright
   let browser: Browser | null = null;
   try {
+    console.log(`[Scraper] Launching Chromium browser...`);
     browser = await chromium.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+      ],
     });
 
     const context = await browser.newContext({
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      viewport: { width: 1920, height: 1080 },
     });
 
     const page = await context.newPage();
+    
+    // Add console logging from page
+    page.on('console', msg => {
+      if (msg.type() === 'error') {
+        console.error(`[Scraper] Browser console error:`, msg.text());
+      }
+    });
 
     let products: ScrapedProduct[];
 
     if (brandScraper) {
+      console.log(`[Scraper] Using specific scraper for ${brandSlug}`);
       products = await brandScraper(page, query);
     } else {
+      console.log(`[Scraper] Using generic scraper for ${brandSlug}`);
       products = await genericScraper(page, brandSlug, query);
     }
 
     await context.close();
     
+    const duration = Date.now() - startTime;
+    console.log(`[Scraper] ✓ Scrape completed for ${brandSlug} in ${duration}ms - found ${products.length} products`);
+    
     return products;
   } catch (error) {
-    console.error(`[Scraper] Error scraping ${brandSlug}:`, error);
+    const duration = Date.now() - startTime;
+    console.error(`[Scraper] ✗ Error scraping ${brandSlug} after ${duration}ms:`, error);
+    if (error instanceof Error) {
+      console.error(`[Scraper] Error stack:`, error.stack);
+    }
     return [];
   } finally {
     if (browser) {
-      await browser.close();
+      try {
+        await browser.close();
+        console.log(`[Scraper] Browser closed for ${brandSlug}`);
+      } catch (err) {
+        console.error(`[Scraper] Error closing browser:`, err);
+      }
     }
   }
 }

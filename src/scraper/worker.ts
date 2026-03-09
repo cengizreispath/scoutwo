@@ -190,18 +190,52 @@ const worker = new Worker<ScrapeJobData>(
 );
 
 worker.on('completed', (job) => {
-  console.log(`[Worker] Job ${job.id} completed`);
+  console.log(`[Worker] ✓ Job ${job.id} completed successfully`);
 });
 
 worker.on('failed', (job, err) => {
-  console.error(`[Worker] Job ${job?.id} failed:`, err);
+  console.error(`[Worker] ✗ Job ${job?.id} failed:`, err);
+  console.error(`[Worker] Job data:`, JSON.stringify(job?.data, null, 2));
 });
 
 worker.on('error', (err) => {
-  console.error('[Worker] Worker error:', err);
+  console.error('[Worker] ⚠ Worker error:', err);
 });
 
-console.log('[Worker] ScoutWo scraper worker started');
+worker.on('active', (job) => {
+  console.log(`[Worker] → Job ${job.id} started processing`);
+});
+
+// Verify Playwright is available
+async function verifyPlaywright() {
+  try {
+    const { chromium } = await import('playwright');
+    console.log('[Worker] ✓ Playwright chromium available');
+    return true;
+  } catch (error) {
+    console.error('[Worker] ✗ Playwright not available:', error);
+    return false;
+  }
+}
+
+// Log worker readiness
+async function logWorkerStatus() {
+  console.log('========================================');
+  console.log('[Worker] ScoutWo scraper worker starting...');
+  console.log('[Worker] Redis connection:', getRedisConnection());
+  console.log('[Worker] Queue: scrape-queue');
+  console.log('[Worker] Concurrency: 2');
+  
+  const playwrightOk = await verifyPlaywright();
+  if (!playwrightOk) {
+    console.error('[Worker] ⚠ WARNING: Playwright check failed - scraping may not work!');
+  }
+  
+  console.log('[Worker] ✓ Worker ready - waiting for jobs...');
+  console.log('========================================');
+}
+
+logWorkerStatus().catch(console.error);
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
