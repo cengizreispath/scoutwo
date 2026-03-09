@@ -2,6 +2,23 @@
 
 ## Active Risks
 
+### 🔴 HIGH: Generic Scraping Reliability (NEW)
+**Description:** Generic product scraping from any e-commerce site may fail on sites with uncommon structures.
+**Impact:** Users may not be able to add products from certain sites.
+**Mitigation:**
+- Implemented multiple extraction strategies (Open Graph, JSON-LD, microdata, CSS selectors)
+- Show clear error messages with failed URL details
+- Allow users to retry
+- Log failures for future scraper improvements
+
+### 🟠 MEDIUM: Brand Auto-Creation Duplicates (NEW)
+**Description:** Automatically creating brands from domains may create duplicate brands (e.g., "zara.com" vs "zara.com/tr").
+**Impact:** Multiple brand records for same brand, inconsistent data.
+**Mitigation:**
+- Brand matching uses domain pattern matching
+- Can be cleaned up later with database normalization
+- Consider brand merging feature in future
+
 ### 🔴 HIGH: Web Scraping Reliability
 **Description:** Generic CSS selectors don't work consistently across all fashion brand websites.
 **Impact:** Products may not be scraped, or wrong data extracted.

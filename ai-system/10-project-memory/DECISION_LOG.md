@@ -1,66 +1,52 @@
-# DECISION_LOG.md - ScoutWo
+# Decision Log - ScoutWo
 
-## Recent Decisions
+## 2026-03-09: Transform to Product Comparison Lists
 
-### 2026-03-09: PM2 for Running Both App and Worker
-**Decision:** Use PM2 process manager to run both Next.js app and scraper worker in a single container.
-**Context:** Coolify docker-compose deployment was only starting the web service, leaving the worker service not running. This caused scraping jobs to queue but never process.
+**Decision:** Removed search-based product aggregation, replaced with manual product URL addition for comparison lists.
+
+**Rationale:**
+- User feedback indicated desire for product comparison across multiple sites
+- Search functionality limited to predefined brand sites
+- Manual URL input allows flexibility to compare any product from any site
+
+**Implementation:**
+- Database: Added `list_items` table, made `searches.query` optional
+- Backend: New tRPC mutations for adding/removing product URLs
+- Scraper: Implemented generic product extraction using Open Graph tags, JSON-LD, and microdata
+- Frontend: Removed search form query/brand inputs, added URL input component
+- UI: Changed all "Arama" (search) terminology to "Liste" (list)
+
 **Trade-offs:**
-- ✅ Simpler deployment (single container)
-- ✅ Both processes guaranteed to run
-- ✅ PM2 provides process monitoring and auto-restart
-- ❌ Both processes share same container resources
-- ❌ Less isolation than separate containers
-**Follow-up:** Monitor container resource usage, may need to increase memory limits.
+- Lost automated product discovery via search
+- Gained flexibility to compare products from any e-commerce site
+- Generic scraping may be less reliable than brand-specific scrapers
+- Better user control over which products to compare
 
-### 2026-03-09: Generic Scraper Approach
-**Decision:** Use a generic scraper with common CSS selectors instead of brand-specific scrapers.
-**Context:** Building individual scrapers for 8+ brands is time-consuming.
-**Trade-offs:**
-- ✅ Faster to implement
-- ✅ Easier to add new brands
-- ❌ Less reliable extraction
-- ❌ May miss brand-specific product details
-**Follow-up:** Monitor success rates per brand, add specific selectors where needed.
+**Risks:**
+- Generic scraping may fail on some sites → Mitigated with multiple extraction strategies
+- Anti-bot detection → Using same Playwright stealth techniques
+- Brand auto-creation from domain → May create duplicate brands
 
-### 2026-03-09: Turkish Domain Focus
-**Decision:** Target Turkish e-commerce domains (zara.com/tr, koton.com, etc.)
-**Context:** Primary user base is Turkish.
-**Trade-offs:**
-- ✅ Prices in TRY
-- ✅ Localized product availability
-- ❌ Limited to Turkish market
+**Commit:** 8af9653
 
-### 2026-03-08: Next.js App Router
-**Decision:** Use Next.js 14 with App Router instead of Pages Router.
-**Context:** Modern approach, better server components support.
-**Trade-offs:**
-- ✅ Better DX with server components
-- ✅ Improved loading states
-- ❌ Some ecosystem libraries not yet compatible
+---
 
-### 2026-03-08: Drizzle ORM
-**Decision:** Use Drizzle ORM instead of Prisma.
-**Context:** Lighter weight, better TypeScript integration.
-**Trade-offs:**
-- ✅ Better performance
-- ✅ SQL-like syntax
-- ❌ Smaller community
+## 2026-03-09: Fixed Worker Not Running in Production
 
-## Pending Decisions
+**Decision:** Migrated from docker-compose multi-service to single container running both Next.js and worker via PM2.
 
-### User Authentication
-**Options:**
-1. NextAuth.js
-2. Clerk
-3. Custom JWT implementation
+**Rationale:** Worker was not running in production, causing scraping jobs to queue but never process.
 
-**Status:** Not decided. Will implement when user features needed.
+**Implementation:** Combined web app and worker in single Dockerfile with PM2 process manager.
 
-### Product Data Updates
-**Options:**
-1. Scheduled cron jobs
-2. On-demand user trigger
-3. Webhook from pipeline
+**Commit:** 4fb3cf6
 
-**Status:** Currently using on-demand trigger. May add cron later.
+---
+
+## 2026-03-09: Fixed Brand Domain Mismatch
+
+**Decision:** Updated scraper domain mappings to match Turkish fashion brands in database.
+
+**Rationale:** Database had fashion brands but scraper was configured for sportswear brands.
+
+**Commit:** 2eda980
