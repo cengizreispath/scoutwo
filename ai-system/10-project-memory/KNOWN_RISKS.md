@@ -33,7 +33,20 @@
 - Configure connection pool size
 - Implement connection timeout
 
+### 🟡 LOW: Single Container Resource Contention
+**Description:** Next.js app and worker now run in the same container, sharing CPU and memory.
+**Impact:** Heavy scraping could slow down the web app, or vice versa.
+**Mitigation:**
+- Monitor container resource usage
+- Increase container memory limit if needed (currently 2G for worker alone)
+- Consider splitting back to separate containers if performance degrades
+
 ## Resolved Risks
+
+### ✅ Worker Not Running in Production (Resolved 2026-03-09)
+**Issue:** Scraper worker service was not running in production, causing scraping jobs to queue but never process. Users clicked "List Products" button but saw no results.
+**Resolution:** Migrated from docker-compose multi-service to single container running both Next.js and worker via PM2 process manager.
+**Commit:** 4fb3cf6
 
 ### ✅ Brand Domain Mismatch (Resolved 2026-03-09)
 **Issue:** Database had fashion brands but scraper only configured for sportswear brands.

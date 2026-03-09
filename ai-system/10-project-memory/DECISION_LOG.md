@@ -2,6 +2,17 @@
 
 ## Recent Decisions
 
+### 2026-03-09: PM2 for Running Both App and Worker
+**Decision:** Use PM2 process manager to run both Next.js app and scraper worker in a single container.
+**Context:** Coolify docker-compose deployment was only starting the web service, leaving the worker service not running. This caused scraping jobs to queue but never process.
+**Trade-offs:**
+- ✅ Simpler deployment (single container)
+- ✅ Both processes guaranteed to run
+- ✅ PM2 provides process monitoring and auto-restart
+- ❌ Both processes share same container resources
+- ❌ Less isolation than separate containers
+**Follow-up:** Monitor container resource usage, may need to increase memory limits.
+
 ### 2026-03-09: Generic Scraper Approach
 **Decision:** Use a generic scraper with common CSS selectors instead of brand-specific scrapers.
 **Context:** Building individual scrapers for 8+ brands is time-consuming.
