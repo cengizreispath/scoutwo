@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { Queue } from 'bullmq';
 import { getRedis } from '@/lib/redis';
 
+// Force dynamic to prevent build-time execution
+export const dynamic = 'force-dynamic';
+
 // Parse Redis connection from REDIS_URL or fallback to host/port
 const getRedisConnection = () => {
   if (process.env.REDIS_URL) {

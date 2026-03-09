@@ -3,6 +3,9 @@ import { db } from '@/server/db';
 import { getRedis } from '@/lib/redis';
 import { sql } from 'drizzle-orm';
 
+// Force dynamic to prevent build-time execution
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   const health = {
     status: 'ok',
