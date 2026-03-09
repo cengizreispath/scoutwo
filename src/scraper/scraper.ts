@@ -133,8 +133,18 @@ const genericScraper = async (page: Page, brandSlug: string, query: string): Pro
   console.log(`[Scraper] Using generic scraper for ${brandSlug}`);
   
   try {
-    // Common brand domains
+    // Common brand domains (fashion brands from DB + sportswear brands)
     const brandDomains: Record<string, string> = {
+      // Fashion brands (seeded in DB)
+      'zara': 'zara.com/tr',
+      'hm': 'www2.hm.com/tr_tr',
+      'mango': 'shop.mango.com/tr',
+      'massimo-dutti': 'massimodutti.com/tr',
+      'koton': 'koton.com',
+      'lcw': 'lcwaikiki.com/tr-TR/TR',
+      'beymen': 'beymen.com',
+      'network': 'network.com.tr',
+      // Sportswear brands (for future use)
       'puma': 'puma.com.tr',
       'reebok': 'reebok.com.tr',
       'new-balance': 'newbalance.com.tr',
@@ -150,7 +160,7 @@ const genericScraper = async (page: Page, brandSlug: string, query: string): Pro
     };
 
     const domain = brandDomains[brandSlug] || `${brandSlug}.com.tr`;
-    const searchUrl = `https://www.${domain}/search?q=${encodeURIComponent(query)}`;
+    const searchUrl = `https://${domain}/search?q=${encodeURIComponent(query)}`;
     
     console.log(`[Scraper] Attempting to scrape ${searchUrl}`);
     
@@ -295,12 +305,6 @@ export async function scrapeProducts(
   
   // Check if we have a specific scraper for this brand
   const brandScraper = BRAND_SCRAPERS[brandSlug.toLowerCase()];
-  
-  // Use mock data only when explicitly enabled (for development/testing)
-  if (process.env.USE_MOCK_SCRAPER === 'true') {
-    console.log(`[Scraper] Using mock data for ${brandSlug} (USE_MOCK_SCRAPER=true)`);
-    return genericScraper(null as any, brandSlug, query);
-  }
 
   // Real scraping with Playwright
   let browser: Browser | null = null;
