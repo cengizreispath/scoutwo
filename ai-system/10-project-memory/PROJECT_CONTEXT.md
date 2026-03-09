@@ -68,3 +68,64 @@ Required:
 
 Optional:
 - `PLAYWRIGHT_HEADLESS` - Run browser headless (default: true)
+
+---
+
+## 🔧 Debugging & Access Commands
+
+### Database Access
+```bash
+# Get connection string from Coolify
+curl -s "https://coolify.dotthedoor.com/api/v1/databases/z0kc4g0o0gog84sgkg0ggg8g" \
+  -H "Authorization: Bearer $(cat /root/.coolify_token)" | jq -r '.connection_string'
+
+# Useful queries (run via psql or API)
+# List brands:
+SELECT id, name, slug FROM brands;
+
+# List recent searches:
+SELECT id, name, created_at FROM searches ORDER BY created_at DESC LIMIT 5;
+
+# Check products for a search:
+SELECT p.name, p.price, p.brand_slug FROM products p
+JOIN search_products sp ON p.id = sp.product_id
+WHERE sp.search_id = 'SEARCH_ID';
+
+# Check scraper results:
+SELECT brand_slug, COUNT(*) as count FROM products GROUP BY brand_slug;
+```
+
+### Application Logs
+```bash
+# Get recent logs from Coolify
+curl -s "https://coolify.dotthedoor.com/api/v1/applications/n0gwgwookgg48cs8o880kss0/logs" \
+  -H "Authorization: Bearer $(cat /root/.coolify_token)" | jq -r '.logs' | tail -50
+```
+
+### Deployment
+```bash
+# Trigger redeploy
+curl -X POST "https://coolify.dotthedoor.com/api/v1/deploy" \
+  -H "Authorization: Bearer $(cat /root/.coolify_token)" \
+  -H "Content-Type: application/json" \
+  -d '{"uuid":"n0gwgwookgg48cs8o880kss0","force":true}'
+
+# Check deployment status
+curl -s "https://coolify.dotthedoor.com/api/v1/applications/n0gwgwookgg48cs8o880kss0" \
+  -H "Authorization: Bearer $(cat /root/.coolify_token)" | jq '{status, updated_at}'
+```
+
+### Local Testing
+```bash
+# Run scraper test for a brand
+cd /tmp/scoutwo
+npm run dev &
+curl -X POST "http://localhost:3000/api/searches/TEST_ID/scrape" \
+  -H "Content-Type: application/json"
+```
+
+### Redis Queue Check
+```bash
+# Check pending jobs (requires redis-cli or API)
+# Jobs are queued in BullMQ format
+```
