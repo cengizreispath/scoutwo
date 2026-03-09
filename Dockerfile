@@ -33,7 +33,8 @@ COPY . .
 # Install Playwright Chromium
 RUN npx playwright install chromium
 
-# Build Next.js
+# Build Next.js (with dummy Redis URL to prevent DNS lookup during build)
+ENV REDIS_URL=redis://localhost:6379
 RUN npm run build
 
 FROM base AS runner
