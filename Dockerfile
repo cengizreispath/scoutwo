@@ -62,7 +62,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
+    adduser --system --uid 1001 --home /home/nextjs nextjs
 
 # Install PM2 globally
 RUN npm install -g pm2
@@ -86,10 +86,14 @@ COPY --from=builder --chown=nextjs:nodejs /app/ecosystem.config.js ./ecosystem.c
 # Fix permissions for Playwright cache
 RUN chown -R nextjs:nodejs /home/nextjs/.cache
 
+# Create PM2 directory with proper permissions
+RUN mkdir -p /home/nextjs/.pm2 && chown -R nextjs:nodejs /home/nextjs
+
 USER nextjs
 
 EXPOSE 3000
 ENV PORT=3000
 ENV PLAYWRIGHT_BROWSERS_PATH=/home/nextjs/.cache/ms-playwright
+ENV PM2_HOME=/home/nextjs/.pm2
 
 CMD ["pm2-runtime", "start", "ecosystem.config.js"]
